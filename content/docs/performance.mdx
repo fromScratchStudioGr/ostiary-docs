@@ -1,0 +1,67 @@
+---
+title: Performance
+description: How fast Ostiary is under heavy load, and how the figures were measured.
+---
+
+Ostiary is built to add as little time as possible to each request, and to keep doing so under heavy load. This page shows what one basic machine handled, and how the figures were measured.
+
+## The short version
+
+On a machine with 8 CPUs and 16 GB of RAM, Ostiary handled **1,400 requests per second for 30 minutes with no errors**. Half of all requests spent less than **0.41 ms** inside Ostiary before being sent on to the provider, not counting the time the key service takes.
+
+Pushed further, the same machine handled up to **2,150 requests per second**, still with no errors. Requests then waited longer inside Ostiary, as the machine got busier.
+
+## How it was measured
+
+- **Machine:** Ostiary ran on one virtual machine with 8 CPUs and 16 GB of RAM, with its [default settings](/docs/configuration). Its database and Redis ran on the same machine, sharing those resources. The mock providers and the load testing tool ran on separate servers, so they did not take any of its resources.
+- **Key service:** the [local key service](/docs/key-management/local).
+- **Providers:** replaced by mock servers that answer like OpenAI and Anthropic, with answers the size of real ones, streamed back as real providers do. This measures Ostiary itself, without the time real providers take to think.
+- **Load:** [k6](https://k6.io), a load testing tool, ran a number of virtual users for 30 minutes. A virtual user acts like an application that keeps sending requests, one after another, following realistic scenarios.
+- **Warmed up:** every virtual user had already made a request before the test began, so the results of Ostiary's checks were already in Redis. This is how a busy, running system looks.
+
+The test was run four times, with 500, 750, 1,000 and 1,500 virtual users.
+
+## Results
+
+### Requests
+
+| Virtual users | Requests per second | Requests in total | Errors |
+|---|---|---|---|
+| 500 | 1,410 | 2,558,624 | 0 |
+| 750 | 1,773 | 3,217,509 | 0 |
+| 1,000 | 1,952 | 3,539,842 | 0 |
+| 1,500 | 2,155 | 3,908,827 | 0 |
+
+### Time spent inside Ostiary
+
+This is the time from Ostiary receiving a request to sending it on to the provider: checking the key, finding the provider key and passing the request on.
+
+It does not include the time the key service takes to unlock the provider key, because that depends on which key service you use. The local key service runs inside Ostiary, while Google Cloud KMS and OpenBao add a trip over the network.
+
+| Requests per second | Median | Average | 95th percentile | 99th percentile |
+|---|---|---|---|---|
+| 1,410 | 0.41 ms | 2 ms | 10 ms | 19.2 ms |
+| 1,773 | 0.48 ms | 5.3 ms | 24.3 ms | 55 ms |
+| 1,952 | 1.1 ms | 11.7 ms | 58.4 ms | 123.8 ms |
+| 2,155 | 5 ms | 27.3 ms | 125 ms | 255 ms |
+
+The median is the time half of all requests stayed under. The 95th percentile is the time 95 out of 100 requests stayed under, and the 99th percentile the time 99 out of 100 stayed under. The average is pulled up by the slowest requests, so the median is the better guide to a typical request.
+
+For comparison, a model usually takes hundreds of milliseconds or more to answer.
+
+### Tokens and data
+
+| Requests per second | Input tokens per second | Output tokens per second | Data received | Data sent back |
+|---|---|---|---|---|
+| 1,410 | 727,246 | 1,241,811 | 6.5 GB | 140 GB |
+| 1,773 | 914,544 | 1,247,249 | 8.2 GB | 177 GB |
+| 1,952 | 1,006,706 | 1,362,378 | 9.0 GB | 195 GB |
+| 2,155 | 1,111,565 | 1,365,176 | 9.9 GB | 215 GB |
+
+Data received is what the applications sent to Ostiary over the 30 minutes. Data sent back is the answers Ostiary passed back to them.
+
+## Scaling up
+
+Ostiary's speed depends mostly on the number of CPUs. In these tests, memory was far from full, even at the highest load. So to handle more requests on one machine, give it more CPUs rather than more memory.
+
+You can also run more copies of the gateway side by side, on one machine or several. They share the same database and Redis, so any copy can serve any request. [Deployment](/docs/deployment) explains how.

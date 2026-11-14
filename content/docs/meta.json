@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "index",
+    "getting-started",
+    "concepts",
+    "configuration",
+    "providers-and-models",
+    "key-management",
+    "admin-panel",
+    "deployment",
+    "monitoring",
+    "performance",
+    "known-limitations"
+  ]
+}

@@ -1,0 +1,197 @@
+---
+title: Official libraries
+description: Use Ostiary from your code with the providers' own libraries.
+---
+
+Ostiary speaks the providers' own formats, so your applications keep using the official libraries. You change two things: the address the library sends requests to, and the key it sends.
+
+- **Address:** Ostiary's gateway instead of the provider. On your own machine, that is `http://localhost:8080`.
+- **Key:** an Ostiary key (starting with `ost_`) instead of a provider key.
+
+Everything else works as before, streaming included.
+
+## Which library to use
+
+The model you ask for decides where the request goes. Use the library that matches the model's format:
+
+| Models | Library | Address to use |
+|---|---|---|
+| OpenAI | OpenAI | `http://localhost:8080/v1` |
+| DeepSeek | OpenAI | `http://localhost:8080/v1` |
+| Anthropic | Anthropic | `http://localhost:8080` |
+| Google Gemini | Google Gen AI | `http://localhost:8080` |
+
+DeepSeek uses the OpenAI format, so the OpenAI library works for DeepSeek models too.
+
+[Providers and models](/docs/providers-and-models) lists every model Ostiary supports.
+
+## OpenAI library
+
+Install it:
+
+```bash tab="Python"
+pip install openai
+```
+
+```bash tab="TypeScript"
+npm install openai
+```
+
+Point it at Ostiary:
+
+```python tab="Python"
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8080/v1",
+    api_key="ost_your_key",
+)
+
+response = client.chat.completions.create(
+    model="gpt-5.4-mini",
+    messages=[{"role": "user", "content": "Hello"}],
+)
+
+print(response.choices[0].message.content)
+```
+
+```ts tab="TypeScript"
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'http://localhost:8080/v1',
+  apiKey: 'ost_your_key',
+});
+
+const response = await client.chat.completions.create({
+  model: 'gpt-5.4-mini',
+  messages: [{ role: 'user', content: 'Hello' }],
+});
+
+console.log(response.choices[0].message.content);
+```
+
+For a DeepSeek model, keep the same setup and change the model, for example to `deepseek-flash`.
+
+<Callout>
+When you stream an answer, the OpenAI format only reports token counts if the request asks for them. Ostiary asks for them on your behalf, so every streamed request is recorded with its cost. You don't need to change anything in your code.
+</Callout>
+
+## Anthropic library
+
+Install it:
+
+```bash tab="Python"
+pip install anthropic
+```
+
+```bash tab="TypeScript"
+npm install @anthropic-ai/sdk
+```
+
+Point it at Ostiary:
+
+```python tab="Python"
+from anthropic import Anthropic
+
+client = Anthropic(
+    base_url="http://localhost:8080",
+    api_key="ost_your_key",
+)
+
+message = client.messages.create(
+    model="claude-sonnet-5-5",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Hello"}],
+)
+
+print(message.content[0].text)
+```
+
+```ts tab="TypeScript"
+import Anthropic from '@anthropic-ai/sdk';
+
+const client = new Anthropic({
+  baseURL: 'http://localhost:8080',
+  apiKey: 'ost_your_key',
+});
+
+const message = await client.messages.create({
+  model: 'claude-sonnet-5-5',
+  max_tokens: 1024,
+  messages: [{ role: 'user', content: 'Hello' }],
+});
+
+for (const block of message.content) {
+  if (block.type === 'text') console.log(block.text);
+}
+```
+
+## Google Gen AI library
+
+Ostiary supports Gemini models through Google's Interactions API, which the Google Gen AI library offers as `interactions`.
+
+Install it:
+
+```bash tab="Python"
+pip install google-genai
+```
+
+```bash tab="TypeScript"
+npm install @google/genai
+```
+
+Point it at Ostiary:
+
+```python tab="Python"
+from google import genai
+
+client = genai.Client(
+    api_key="ost_your_key",
+    http_options={"base_url": "http://localhost:8080"},
+)
+
+interaction = client.interactions.create(
+    model="gemini-3.8-flash",
+    input="Hello",
+)
+
+print(interaction.output_text)
+```
+
+```ts tab="TypeScript"
+import { GoogleGenAI } from '@google/genai';
+
+const client = new GoogleGenAI({
+  apiKey: 'ost_your_key',
+  httpOptions: { baseUrl: 'http://localhost:8080' },
+});
+
+const interaction = await client.interactions.create({
+  model: 'gemini-3.8-flash',
+  input: 'Hello',
+});
+
+console.log(interaction.output_text);
+```
+
+## Keeping the key out of your code
+
+The examples above put the key in the code to keep them short. In a real application, read it from an environment variable instead. Both libraries also read their address and key from environment variables when you leave them out of the code:
+
+| Library | Address | Key |
+|---|---|---|
+| OpenAI | `OPENAI_BASE_URL` | `OPENAI_API_KEY` |
+| Anthropic | `ANTHROPIC_BASE_URL` | `ANTHROPIC_API_KEY` |
+
+These are set where your application runs. Ostiary has settings with the same names, `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL`, which mean something different: they tell Ostiary where to send requests on to. In your application, the address points at Ostiary. In Ostiary, it points at the provider.
+
+## Using Ostiary without a library
+
+Any HTTP client works. Send the Ostiary key in one of these headers, whichever your client already uses:
+
+- `Authorization: Bearer ost_your_key`
+- `x-api-key: ost_your_key`
+- `x-goog-api-key: ost_your_key`
+
+The [quick start](/docs/getting-started/quick-start#6-send-your-first-request) has a `curl` example, and [providers and models](/docs/providers-and-models#formats) lists the endpoints.

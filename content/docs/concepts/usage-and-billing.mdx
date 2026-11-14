@@ -1,0 +1,45 @@
+---
+title: Usage and billing
+description: How Ostiary records the tokens and cost of every request.
+---
+
+Ostiary records the usage of every successful request: how many tokens it used and what they cost. You can see it in the admin panel, for everyone or for a single consumer.
+
+## What is recorded
+
+Providers charge by the token, a small piece of text, roughly three quarters of a word. Different kinds of tokens have different prices, so Ostiary records each kind separately:
+
+| Kind | What it is |
+|---|---|
+| Output | The tokens the model wrote in its answer. |
+| Input | The tokens you sent, which the provider had not seen recently. |
+| Cached input | Tokens you sent that the provider had seen recently and kept ready. They cost much less than normal input. |
+| Cache writes | Tokens the provider stored so later requests can reuse them as cached input. Some providers charge extra for these, and some have two rates depending on how long they are kept. |
+
+Each request is recorded against the consumer that made it and the provider key it used.
+
+## How the cost is worked out
+
+Ostiary knows the price of every model it supports, in US dollars. When an answer is complete, Ostiary reads the token counts the provider sends with it and multiplies each kind by its price. Some models have extra pricing rules, such as a higher price for very long requests or at busy hours. Ostiary applies those too. [Providers and models](/docs/providers-and-models) lists the models and how each is priced.
+
+The cost is worked out at the moment the request is made, using the prices in that version of Ostiary. If prices change later, requests already made keep their original cost.
+
+This works the same for streamed answers. With the OpenAI format, a streamed answer only includes token counts if the request asks for them, so Ostiary asks on your behalf.
+
+## Ostiary's cost and your invoice
+
+The cost Ostiary records is its own count, based on each model's list price. It can differ from what your provider charges you, for example because of discounts or taxes, or because a provider changed its prices before Ostiary was updated. Use Ostiary's numbers to see who is spending what, and your provider's invoice for what you actually pay.
+
+## When usage is recorded
+
+To keep requests fast, Ostiary does not write usage to the database while answering. It puts the usage in a queue and writes it in the background, so it shows up in the panel a moment after the request finishes.
+
+The queue is kept in Redis, with its data saved to disk, so usage is not lost if Ostiary restarts. If the database is unavailable, Ostiary keeps trying to write the usage, with longer waits between attempts. By default it keeps trying for weeks. You can change this with `USAGE_TASK_MAX_RETRY`.
+
+If an application disconnects before the answer is complete, the provider still charges for the answer it produces. Ostiary keeps reading the answer for up to a minute, so it can still record its usage. You can change this time with `USAGE_DRAIN_LIMIT`, described in [configuration](/docs/configuration).
+
+**Requests that fail, where the provider answers with an error, carry no usage and are not recorded.**
+
+## Seeing usage
+
+The **Usage** page of the admin panel shows cost and tokens for the last 7, 14 or 21 days, or for all time. You can look at everyone together or at a single consumer, and filter by provider.

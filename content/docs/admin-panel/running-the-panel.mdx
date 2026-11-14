@@ -1,0 +1,50 @@
+---
+title: Running the panel
+description: Run the admin panel with Ostiary or on its own, and connect it to the admin API.
+---
+
+The admin panel is a web app for managing Ostiary: provider keys, consumers, access, Ostiary keys, usage and admin users. Its code is in its own repository, [Ostiary panel](https://github.com/fromScratchStudioGr/ostiary-panel).
+
+The panel only talks to Ostiary's **admin API**, never to the gateway. Your browser loads the panel, and then calls the admin API directly.
+
+## With Docker Compose
+
+The easiest way is to run the panel together with Ostiary. The [quick start](/docs/getting-started/quick-start) starts both with one command, already set up to work together. The panel then opens at http://localhost:3001.
+
+To publish it on another port, set `PANEL_PORT` in `.env`. [Configuration](/docs/configuration#docker-compose-settings) lists all the Docker Compose settings.
+
+## On its own
+
+{/* TODO: replace PANEL_IMAGE with the published image name once the container registry is chosen. */}
+
+The panel is published as a Docker image, `PANEL_IMAGE`, and listens on port 3001.
+
+The panel needs to know the address of the admin API, such as `https://admin.example.com`. Your browser calls the admin API directly, so use an address your browser can open, not a name that only works inside Docker.
+
+<Callout type="warn">
+The admin API's address is built into the panel when its image is built, through `NEXT_PUBLIC_API_URL`. So you need to build the image yourself, with your own address.
+</Callout>
+
+To build the panel with your address and start it, from a copy of the panel's repository:
+
+```bash
+docker build --build-arg NEXT_PUBLIC_API_URL=https://admin.example.com -t ostiary-panel .
+docker run -d -p 3001:3001 ostiary-panel
+```
+
+## Connecting it to the admin API
+
+Two settings on the admin API must match where the panel runs, or signing in will not work. Docker Compose already sets both for http://localhost:3001.
+
+| Setting | What to set it to |
+|---|---|
+| `CORS_ALLOWED_ORIGIN` | The panel's exact address, such as `https://panel.example.com`. The admin API only accepts changes from this address. |
+| `COOKIE_SAMESITE` | `lax` if the panel and the admin API share a domain, such as `panel.example.com` and `admin.example.com`. `none` if they don't. |
+
+The panel keeps you signed in with a cookie, and `COOKIE_SAMESITE` decides when the browser sends it. With `none`, the cookie is only sent over HTTPS, so both the panel and the admin API must use HTTPS.
+
+## HTTPS
+
+Outside your own machine, serve both the panel and the admin API over HTTPS, usually behind a reverse proxy, a web server that handles HTTPS in front of them. The panel tells browsers to only ever use HTTPS for it.
+
+On the admin API, also set `ENV` to `production`, so the sign-in cookie is only ever sent over HTTPS, and turn on `HSTS_ENABLED`. [Deployment](/docs/deployment) has the full checklist.

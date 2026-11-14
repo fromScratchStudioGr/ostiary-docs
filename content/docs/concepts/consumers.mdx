@@ -1,0 +1,27 @@
+---
+title: Consumers
+description: The applications, teams or people that use Ostiary.
+---
+
+A consumer is whoever uses Ostiary: an application, a team or a person. It is how Ostiary knows who sent a request, what they may use and what they have spent.
+
+A consumer has:
+
+- A name, so you can recognise it.
+- [Access](/docs/concepts/access-and-limits) to one or more provider keys, each with an optional spending limit.
+- One or more [Ostiary keys](/docs/concepts/ostiary-keys), which it uses to call Ostiary.
+- Its [usage](/docs/concepts/usage-and-billing): the tokens and cost of every request it made.
+
+How you split consumers is up to you. A common choice is one consumer per application, so you can see what each one costs and switch one off without touching the others.
+
+Consumers never sign in to Ostiary. Only admin users sign in, to the admin panel, to manage consumers and everything else.
+
+## Switching a consumer off and on
+
+You can switch a consumer off at any time. While it is off, all its requests are refused, whichever Ostiary key they use. Its keys, access and usage are kept, so switching it back on restores everything as it was.
+
+## Deleting a consumer
+
+Deleting a consumer also deletes all its Ostiary keys, so they stop working. The usage already recorded for it is kept.
+
+If you only want to stop a consumer for a while, switch it off instead.

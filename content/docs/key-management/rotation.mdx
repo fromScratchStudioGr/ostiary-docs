@@ -1,0 +1,65 @@
+---
+title: Rotation
+description: Replace the master key with a new version, and move your provider keys onto it.
+---
+
+Rotating the master key means creating a new version of it, which is used from then on. It limits how much one version of the key ever protects, and is a common security rule.
+
+Google Cloud KMS and OpenBao can rotate their keys. The [local key service](/docs/key-management/local) cannot.
+
+## What happens to your provider keys
+
+Rotating the key does not break anything. Provider keys added before the rotation stay on the old version of the key, and still work. Provider keys added after it use the new version.
+
+To move all your provider keys onto the new version, so you can retire the old one, use **Rewrap keys** in the admin panel. Rewrapping encrypts each provider key's own key again with the current version of the master key. The provider keys themselves don't change.
+
+## Rotating, step by step
+
+### 1. Rotate the key in your key service
+
+**OpenBao:**
+
+```bash
+bao write -f transit/keys/ostiary-dek-wrap/rotate
+```
+
+It shows the new version as `latest_version`.
+
+**Google Cloud KMS:** create a new version and make it the main one:
+
+```bash
+gcloud kms keys versions create --key=dek-wrapper --keyring=ostiary --location=LOCATION --project=PROJECT_ID --primary
+```
+
+Google Cloud can also rotate the key on a schedule, which is the usual choice for real use. See `--rotation-period` and `--next-rotation-time` in [Google's guide to rotating keys](https://cloud.google.com/kms/docs/rotate-key).
+
+### 2. Rewrap your provider keys
+
+In the admin panel, open the **Provider Keys** page and click **Rewrap keys**.
+
+The panel then shows how many keys were rewrapped. If some failed, it lists them. Click **Rewrap keys** again to retry just those. Running it more than once is harmless, and it also works when the key has not been rotated.
+
+With OpenBao, the rewrap happens inside OpenBao, so no key ever leaves it. Google Cloud KMS has no way to rewrap in place, so the admin API unlocks each key and encrypts it again. The unlocked key is in the admin API's memory only for that moment.
+
+### 3. Retire the old version
+
+Only retire the old version once both of these are true:
+
+- **Rewrap keys** finished with no failures.
+- At least `LOCAL_CACHE_TTL` has passed since then, 5 minutes by default. Each gateway may still have the old version in memory until then.
+
+Then:
+
+**OpenBao:** stop the old version from unlocking anything, here version 1:
+
+```bash
+bao write transit/keys/ostiary-dek-wrap/config min_decryption_version=2
+```
+
+**Google Cloud KMS:** disable the old version. You can turn it back on later if needed, so disable it first and only destroy it once you are sure:
+
+```bash
+gcloud kms keys versions disable OLD_VERSION --key=dek-wrapper --keyring=ostiary --location=LOCATION --project=PROJECT_ID
+```
+
+If a request does reach a gateway that still had the old version in memory, it fails once, and the next request works.

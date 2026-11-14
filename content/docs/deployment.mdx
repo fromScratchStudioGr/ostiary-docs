@@ -1,0 +1,117 @@
+---
+title: Deployment
+description: What to change before you use Ostiary for real, and how to scale it.
+---
+
+The [quick start](/docs/getting-started/quick-start) is made for trying Ostiary out on your own machine. Before you use it for real, go through the checklist below.
+
+## Checklist
+
+### 1. Use a real key service
+
+The local key service is for trying Ostiary out only. Choose [Google Cloud KMS](/docs/key-management/google-cloud-kms) or your own [OpenBao](/docs/key-management/openbao) server, and do it before you add any provider keys: keys added with one key service can't be read by another.
+
+### 2. Change every default secret
+
+Every default password and secret is public, because it is in the Ostiary code. Change all of them in `.env`:
+
+| Setting | What it protects |
+|---|---|
+| `POSTGRES_PASSWORD` | The database. |
+| `REDIS_PASSWORD` | Redis. |
+| `JWT_SECRET` | Admin sign-ins. Anyone who knows it can sign in as any admin. |
+| `HEALTH_CHECK_TOKEN` | The `/health` check. |
+| `METRICS_TOKEN` | The metrics on `/metrics`. |
+
+Use long random values. Hex values are safest, because `POSTGRES_PASSWORD` is also used inside a database address, where characters such as `/` and `@` break it:
+
+```bash tab="bash"
+openssl rand -hex 32
+```
+
+```bat tab="cmd"
+powershell -NoProfile -Command "$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ($b | ForEach-Object { $_.ToString('x2') }) -join ''"
+```
+
+```powershell tab="PowerShell"
+$b = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+($b | ForEach-Object { $_.ToString('x2') }) -join ''
+```
+
+Set `POSTGRES_PASSWORD` before you start Ostiary for the first time. Postgres only takes its password when it first creates its data. Changing `POSTGRES_PASSWORD` later does not change the database's own password, so Ostiary can no longer connect.
+
+Also change the password of the `admin` account in the panel straight away, as [signing in and admins](/docs/admin-panel/signing-in-and-users) explains.
+
+### 3. Use HTTPS
+
+Serve the gateway, the admin API and the panel over HTTPS, usually behind a reverse proxy: a web server, such as Caddy or nginx, that handles HTTPS in front of them. Ostiary itself speaks plain HTTP.
+
+Once that works, set these on the admin API and the gateway:
+
+| Setting | Value | Why |
+|---|---|---|
+| `ENV` | `production` | The admin sign-in cookie is then only sent over HTTPS. |
+| `HSTS_ENABLED` | `true` | Browsers then only ever use HTTPS for Ostiary. |
+
+### 4. Connect the panel to the admin API
+
+Set the panel's address and the admin API's address, so signing in works:
+
+- `CORS_ALLOWED_ORIGIN`: the panel's exact address, such as `https://panel.example.com`.
+- `COOKIE_SAMESITE`: `lax` if the panel and the admin API share a domain, `none` if they don't.
+- `NEXT_PUBLIC_API_URL`: the admin API's address, as the browser reaches it. Rebuild the panel after changing it.
+
+[Running the panel](/docs/admin-panel/running-the-panel) explains these.
+
+### 5. Limit who can reach what
+
+Each part of Ostiary is meant for different people:
+
+| Part | Who needs to reach it |
+|---|---|
+| Gateway, `/v1/...` | Your applications. |
+| Admin API and panel | Your admins only. |
+| `/metrics` on the gateway and the admin API | Your monitoring only. |
+| Postgres and Redis | Only the gateway and the admin API. |
+
+Keep the admin API and the panel private, for example behind a VPN or a firewall that only lets your own addresses in. `/health` and `/metrics` need their tokens, but there is no reason to make them public either. Docker Compose does not publish Postgres and Redis outside Docker, so keep it that way.
+
+### 6. Keep backups
+
+Back up the Postgres database regularly. It holds everything: admins, provider keys, consumers, access, Ostiary keys and usage.
+
+The provider keys in a backup can only be unlocked by the key service that encrypted them. So also keep that key safe: the master key of the local key service, OpenBao's own storage, or the key in Google Cloud KMS. Never delete an old key version that a backup may still need.
+
+### 7. Monitor it
+
+Watch `/health` and the metrics on `/metrics`, as [monitoring](/docs/monitoring) explains.
+
+## Scaling
+
+One machine handles a lot, as [performance](/docs/performance) shows. To handle more:
+
+- **Give the machine more CPUs.** Ostiary's speed depends mostly on CPUs, and it uses little memory.
+- **Run more copies of the gateway.** Every copy shares the same Postgres and Redis, so any copy can serve any request. Put a load balancer in front of them, such as your reverse proxy, to spread requests across them.
+
+Things to know when you run several gateways:
+
+- **Database connections.** Each gateway opens up to `POSTGRE_MAX_OPEN_CONNS` connections, 75 by default. Keep the total of all gateways, plus the admin API's, below what your Postgres server allows.
+- **Creating tables.** Each gateway creates and updates the database tables when it starts. To avoid several doing it at once, start one first, or set `POSTGRE_AUTO_MIGRATE` to `false` on all but one.
+- **Changes in the panel.** Each gateway keeps the results of its checks in memory for up to `LOCAL_CACHE_TTL`, 5 minutes by default. A change in the panel, such as revoking a key, can take that long to reach every gateway.
+- **One admin API is enough.** It only serves the panel.
+
+The Docker Compose file runs one gateway. To run more, start more gateway containers with the same settings, on one machine or several.
+
+## Updating Ostiary
+
+{/* TODO: once the panel image is published, add how to update the panel image. */}
+
+To update to a new version, get the new code and rebuild:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+The gateway updates the database tables when it starts. Your data stays in place.

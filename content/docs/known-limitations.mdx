@@ -1,0 +1,31 @@
+---
+title: Known limitations
+description: What version 1 of Ostiary does not do yet, and what is planned.
+---
+
+This page lists what version 1 of Ostiary does not support, or supports with limits. Most of these are planned for a later version.
+
+## Features that are not supported yet
+
+For most of these, requests still work. What is missing is that Ostiary does not record their cost correctly.
+
+- **Anthropic server tools.** Anthropic charges for each use of the tools it runs itself, such as web search and web fetch. Ostiary only counts tokens, so the cost it records for these requests is lower than what Anthropic charges.
+- **Service tiers.** OpenAI's and Gemini's `priority` and `flex` tiers, and Anthropic's Priority Tier, have their own prices. Ostiary prices every request at the standard rates.
+- **Audio and image input.** Providers price audio and image tokens differently from text. Ostiary prices them all as text.
+- **Gemini's explicit caching.** Ostiary only counts Gemini's automatic caching. Caches you create yourself with `cachedContents` are not priced correctly.
+- **Gemini background requests.** With `background: true`, Gemini answers later, through a separate request. Ostiary does not pass that request on, so its usage is not recorded.
+- **Batch calls.** The providers' batch calls, where you send many requests at once and collect the answers later, are not supported at all. Ostiary answers them with `404 Not Found`. Send them to the provider directly.
+
+## Spending limits
+
+- **Spending can go over a limit.** Ostiary only knows a request's cost once it has finished and its usage is recorded. Requests that start under the limit all finish, so a busy consumer can spend noticeably more than its limit before it is stopped. If recording usage falls behind, the gap grows. A later version will set aside an estimated cost when a request starts.
+- **With several gateways, the limit takes longer to apply.** When a consumer goes over its limit, only the gateway that recorded the last request stops it straight away. The others can keep letting its requests through for up to `LOCAL_CACHE_TTL`, 5 minutes by default.
+
+## Access
+
+- **One provider key per provider for each consumer.** If a consumer has access to more than one key from the same provider, Ostiary always uses the one it was given access to first. The others are not used, even if the first is revoked or over its limit. [Access and spending limits](/docs/concepts/access-and-limits) explains this.
+
+## Running Ostiary
+
+- **Restarting cuts off requests in progress.** When the gateway stops, for an update or a restart, it does not wait for requests that are still running. Those requests fail, and their usage may not be recorded. A later version will finish them first. Until then, restart gateways when traffic is low, or one at a time behind a load balancer.
+- **The panel is built for one admin API address.** The admin API's address is built into the panel when it is built, so you build the panel yourself with your own address. [Running the panel](/docs/admin-panel/running-the-panel) explains how.

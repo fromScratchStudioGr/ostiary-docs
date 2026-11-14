@@ -1,0 +1,4 @@
+{
+  "title": "Key management",
+  "pages": ["index", "local", "google-cloud-kms", "openbao", "rotation"]
+}

@@ -1,0 +1,119 @@
+---
+title: Monitoring
+description: Check Ostiary's health, collect its metrics with Prometheus, and read its logs.
+---
+
+Ostiary gives you three ways to see how it is doing: a health check, metrics for [Prometheus](https://prometheus.io), and logs. The gateway and the admin API each have their own.
+
+## Health check
+
+`GET /health` tells you whether Ostiary can reach its database and Redis. It needs `HEALTH_CHECK_TOKEN` in the `x-api-key` header.
+
+```bash
+curl http://localhost:8080/health -H "x-api-key: health-check-token-change-me"
+```
+
+When everything is fine, it answers `200 OK`:
+
+```json
+{"status": "ok", "checks": {"postgres": "ok", "redis": "ok"}}
+```
+
+When Postgres or Redis can't be reached, it answers `503 Service Unavailable`, with the error in place of `ok`. With a missing or wrong token, it answers `401 Unauthorized`.
+
+The admin API has the same check on its own port, `http://localhost:8081/health`. Docker Compose already uses both to know when the containers are ready, and load balancers can use them to stop sending requests to a gateway that is unwell.
+
+## Metrics
+
+`GET /metrics` publishes Ostiary's metrics in the format Prometheus reads. It needs `METRICS_TOKEN` in the `x-api-key` header.
+
+### Setting up Prometheus
+
+Prometheus 2.55 and later can send the token with `http_headers`. Add a scrape job for each gateway and for the admin API:
+
+```yaml title="prometheus.yml"
+scrape_configs:
+  - job_name: ostiary-gateway
+    static_configs:
+      - targets: ["localhost:8080"]
+    http_headers:
+      x-api-key:
+        secrets: ["metrics-token-change-me"]
+
+  - job_name: ostiary-admin
+    static_configs:
+      - targets: ["localhost:8081"]
+    http_headers:
+      x-api-key:
+        secrets: ["metrics-token-change-me"]
+```
+
+Replace `metrics-token-change-me` with your own `METRICS_TOKEN`, and the targets with the addresses Prometheus reaches Ostiary at. Listing the token under `secrets` keeps it hidden in Prometheus's own pages.
+
+### What is measured
+
+Most of the gateway's metrics are timings: how long each step of handling a request takes. Each is a histogram, so you can work out the median, the 95th percentile and so on, over any time range.
+
+| Metric | What it measures |
+|---|---|
+| `gateway_phase_time_to_forward_duration_seconds` | The time from receiving a request to sending it on to the provider. This is all the time Ostiary adds. |
+| `gateway_phase_time_to_forward_excl_kms_duration_seconds` | The same, without the time spent waiting for the key service. This is what [performance](/docs/performance) shows, because the key service's time depends on which one you use. |
+| `gateway_phase_kms_decrypt_duration_seconds` | How long the key service takes to unlock a provider key. |
+| `gateway_phase_provider_roundtrip_duration_seconds` | How long the provider takes to answer. |
+| `gateway_phase_handle_cache_duration_seconds` | How long Ostiary's checks take: the key, the consumer, access and limits. |
+| `gateway_phase_handle_cache_db_lookup_duration_seconds` | How long those checks take when they need the database, because the results weren't remembered yet. |
+| `gateway_cache_lookups_total` | How often the checks were found in the gateway's memory (`local_hit`), in Redis (`hit`), or had to go to the database (`miss`). |
+
+There are a few more `gateway_phase_..._duration_seconds` metrics for smaller steps, such as reading the request and reading the usage from the answer.
+
+Both the gateway and the admin API also publish the standard Go and process metrics, such as memory and CPU use.
+
+### Useful queries
+
+The median time Ostiary adds, over the last 5 minutes:
+
+```
+histogram_quantile(0.5, sum by (le) (rate(gateway_phase_time_to_forward_duration_seconds_bucket[5m])))
+```
+
+The 99th percentile of the same:
+
+```
+histogram_quantile(0.99, sum by (le) (rate(gateway_phase_time_to_forward_duration_seconds_bucket[5m])))
+```
+
+To compare with the [performance](/docs/performance) figures, use `gateway_phase_time_to_forward_excl_kms_duration_seconds` in these instead.
+
+How often the checks had to go to the database:
+
+```
+sum(rate(gateway_cache_lookups_total{result="miss"}[5m])) / sum(rate(gateway_cache_lookups_total[5m]))
+```
+
+A busy, running system should have few misses: one for each Ostiary key and model, every so often.
+
+## Logs
+
+The gateway and the admin API write their logs to the console, one line per event, which Docker shows with:
+
+```bash
+docker compose logs -f gateway admin
+```
+
+Each line has a time, a level (`INFO`, `WARN` or `ERROR`), a message and details such as the consumer or model involved.
+
+A few messages are worth an alert, because they mean usage may not have been recorded:
+
+- `UNBILLED USAGE`: a provider's answer came without usage information, so nothing was recorded for it.
+- `could not store usage`: Ostiary could not record a request's usage at all.
+
+### Sending logs to Seq
+
+Ostiary can also send its logs to [Seq](https://datalust.co/seq), a server for searching and alerting on logs. Set these on both the gateway and the admin API:
+
+| Setting | Value |
+|---|---|
+| `SEQ_URL` | The full address Seq receives logs at, ending in `/ingest/clef`, such as `https://seq.example.com/ingest/clef`. |
+| `SEQ_API_KEY` | An API key from Seq, if your Seq server needs one. |
+
+Logs still go to the console as well.

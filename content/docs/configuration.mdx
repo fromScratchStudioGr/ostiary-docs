@@ -1,0 +1,181 @@
+---
+title: Configuration
+description: Every setting Ostiary reads, with its default.
+---
+
+Ostiary is configured with environment variables. Every setting has a default, so Ostiary runs without any of them except the master key for the local key service.
+
+The default passwords and secrets are only for trying Ostiary out on your own machine. Before real use, change them, as [deployment](/docs/deployment) describes.
+
+The defaults for performance, such as connection and pool sizes, are the settings the [performance](/docs/performance) figures were measured with. You don't need to tune anything to get those results.
+
+## How settings are read
+
+Ostiary runs as two programs, the **gateway** and the **admin API**. Both read their settings when they start, so after changing a setting, restart them.
+
+With Docker Compose, put your settings in the `.env` file next to `docker-compose.yml`, the same file that holds the master key:
+
+```bash title=".env"
+LOCAL_KMS_MASTER_KEY=your-master-key
+POSTGRES_PASSWORD=a-long-random-password
+REDIS_PASSWORD=another-long-random-password
+JWT_SECRET=yet-another-long-random-secret
+```
+
+Then apply them:
+
+```bash
+docker compose up -d
+```
+
+Docker Compose only passes on the settings that `docker-compose.yml` lists. The tables below point out the few that it does not, which you can't change from `.env` without also editing `docker-compose.yml`.
+
+A few things about values:
+
+- **Durations** are written as a number and a unit, such as `30s`, `5m` or `1h`.
+- **Yes or no settings** take `true` or `false`.
+- **Check the format carefully.** If Ostiary can't read a value, such as `5 min` instead of `5m`, it quietly uses the default instead, without an error.
+
+## Docker Compose settings
+
+These settings belong to `docker-compose.yml` itself, not to Ostiary. Compose uses them to set up the containers and to fill in Ostiary's own settings.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `GATEWAY_PORT` | `8080` | The port the gateway is published on. |
+| `ADMIN_PORT` | `8081` | The port the admin API is published on. |
+| `PANEL_PORT` | `3001` | The port the admin panel is published on. |
+| `POSTGRES_PASSWORD` | `postgres-password-change-me` | The password of the Postgres database. Compose also uses it to build `POSTGRE_ADDR`. |
+| `REDIS_PASSWORD` | `redis-password-change-me` | The password of Redis. Compose also passes it to Ostiary as its own `REDIS_PASSWORD`. |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8081` | The address of the admin API, as the browser reaches it. The admin panel is built with this address in it. |
+
+Compose builds the admin panel with `NEXT_PUBLIC_API_URL` inside it. If you change `NEXT_PUBLIC_API_URL` or `ADMIN_PORT`, rebuild the panel so it picks up the new address:
+
+```bash
+docker compose up -d --build panel
+```
+
+[Key management](/docs/key-management) covers the extra Compose settings for Google Cloud KMS and OpenBao.
+
+## Gateway
+
+| Setting | Default | What it does |
+|---|---|---|
+| `LISTEN_ADDR` | `:8080` | The address and port the gateway listens on. |
+| `LOCAL_CACHE_TTL` | `5m` | How long each gateway keeps the result of its checks in memory. This is also the longest a change made in the admin panel takes to reach every gateway. `0` turns this memory off. |
+| `PROVIDER_MAX_IDLE_CONNS` | `2000` | How many open connections to providers the gateway keeps ready for reuse. |
+| `PROVIDER_MAX_IDLE_CONNS_PER_HOST` | `2000` | The same, for each provider. |
+
+With Docker Compose, `LISTEN_ADDR` is not passed on. To publish the gateway on another port, use `GATEWAY_PORT` instead.
+
+Keeping connections to providers ready saves time on every request. Setting these too low does not make requests fail, it only makes them slower under heavy load.
+
+## Admin API
+
+| Setting | Default | What it does |
+|---|---|---|
+| `ADMIN_LISTEN_ADDR` | `:8081` | The address and port the admin API listens on. |
+| `JWT_SECRET` | `jwt-secret-change-me` | The secret that signs admin sign-ins. Anyone who knows it can sign in as any admin, so change it and keep it private. |
+| `JWT_EXPIRATION_HOURS` | `48` | How many hours an admin stays signed in. |
+| `CORS_ALLOWED_ORIGIN` | `http://localhost:3001` | The exact address of the admin panel, such as `https://panel.example.com`. The admin API refuses changes that come from any other address. |
+| `COOKIE_SAMESITE` | `lax` | When the browser sends the sign-in cookie: `lax`, `strict` or `none`. Use `lax` when the panel and the admin API share a domain, such as `panel.example.com` and `admin.example.com`. Use `none` when they don't. |
+
+With Docker Compose, `ADMIN_LISTEN_ADDR` is fixed. To publish the admin API on another port, use `ADMIN_PORT` instead.
+
+[Running the panel](/docs/admin-panel/running-the-panel) explains how `CORS_ALLOWED_ORIGIN` and `COOKIE_SAMESITE` must match where the panel runs.
+
+## Postgres
+
+Postgres is the database. It holds admin users, provider keys, consumers, access, Ostiary keys and usage.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `POSTGRE_ADDR` | `postgres://postgres:postgres-password-change-me@localhost:5432/ostiary?sslmode=disable` | How to reach the database. Used by both programs. If the database in it does not exist, Ostiary creates it. |
+| `POSTGRE_AUTO_MIGRATE` | `true` | Whether the gateway creates and updates its tables when it starts. |
+| `POSTGRE_MAX_OPEN_CONNS` | `75` | The most database connections each gateway opens at once. |
+| `POSTGRE_MAX_IDLE_CONNS` | `75` | How many of those each gateway keeps open while idle. |
+| `ADMIN_POSTGRE_MAX_OPEN_CONNS` | `10` | The most database connections the admin API opens at once. |
+| `ADMIN_POSTGRE_MAX_IDLE_CONNS` | `5` | How many of those the admin API keeps open while idle. |
+
+With Docker Compose, `POSTGRE_ADDR` is built for you from `POSTGRES_PASSWORD`.
+
+Only the gateway creates and updates tables, so it must start before the admin API. Docker Compose already starts them in that order. Leave `POSTGRE_AUTO_MIGRATE` on unless you manage the database tables yourself.
+
+When you run several gateways, each opens up to `POSTGRE_MAX_OPEN_CONNS` connections. Keep the total, plus the admin API's, below the number of connections your Postgres server allows.
+
+## Redis
+
+Redis is a fast in-memory store. Ostiary uses it to share the results of its checks between gateways, and as the queue for recording usage.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `REDIS_ADDR` | `localhost:6379` | How to reach Redis, as host and port. Used by both programs. |
+| `REDIS_USERNAME` | `ostiary` | The Redis user Ostiary signs in as. |
+| `REDIS_PASSWORD` | `redis-password-change-me` | That user's password. |
+| `REDIS_POOL_SIZE` | `5000` | The most Redis connections each gateway opens at once. |
+| `ADMIN_REDIS_POOL_SIZE` | `10` | The most Redis connections the admin API opens at once. |
+
+With Docker Compose, `REDIS_ADDR` is fixed. Compose also creates the `ostiary` user in Redis, allowed to touch only Ostiary's own data.
+
+Because Redis holds the usage queue, it must keep its data. Run it with saving to disk turned on, and without a memory limit that throws data away, or usage can be lost. The Docker Compose setup already does both.
+
+## Providers
+
+| Setting | Default | What it does |
+|---|---|---|
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Where the gateway sends requests for OpenAI models. |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Where the gateway sends requests for Anthropic models. |
+| `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta` | Where the gateway sends requests for Google Gemini models. |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | Where the gateway sends requests for DeepSeek models. |
+
+You only need to change these to send a provider's requests somewhere else, such as a proxy in front of the provider, or a mock server for testing. Each address must start with `http://` or `https://` and must not end with a `/`. If one is not valid, the gateway does not start.
+
+With Docker Compose, a server running on your own machine is reachable from the gateway as `http://host.docker.internal:<port>`.
+
+## Usage
+
+| Setting | Default | What it does |
+|---|---|---|
+| `USAGE_WORKER_CONCURRENCY` | `10` | How many usage records each gateway writes to the database at once. Each one uses a database connection while it runs. |
+| `USAGE_TASK_MAX_RETRY` | `25` | How many times Ostiary tries again to write a usage record that failed to save. The waits between attempts grow, so the default keeps trying for weeks. |
+| `USAGE_DRAIN_LIMIT` | `1m` | How long the gateway keeps reading an answer, to record its usage, after the application that asked for it has disconnected. |
+
+[Usage and billing](/docs/concepts/usage-and-billing) explains how usage is recorded.
+
+## Key service
+
+These choose and connect the key service that keeps provider keys encrypted. The gateway and the admin API must use the same key service, with the same settings: the admin API encrypts provider keys when you add them, and the gateway unlocks them.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `KMS_PROVIDER` | `local` | Which key service to use: `local`, `gcp` or `openbao`. Any other value means `local`. |
+| `LOCAL_KMS_MASTER_KEY` | None | The master key of the local key service: 32 random bytes, written in base64. Required when `KMS_PROVIDER` is `local`. |
+| `GCP_KMS_KEY_NAME` | None | The full name of the Google Cloud KMS key. Required when `KMS_PROVIDER` is `gcp`. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | None | The path to a Google Cloud service account file, for `gcp`. This is Google's own setting. |
+| `OPENBAO_VAULT_ADDR` | None | The address of the OpenBao server. Required when `KMS_PROVIDER` is `openbao`. |
+| `OPENBAO_VAULT_TOKEN` | None | The token Ostiary signs in to OpenBao with. Required when `KMS_PROVIDER` is `openbao`. |
+| `OPENBAO_VAULT_KEYNAME` | None | The name of the key in OpenBao. Required when `KMS_PROVIDER` is `openbao`. |
+
+With Docker Compose, only `LOCAL_KMS_MASTER_KEY` is passed on by `docker-compose.yml`. The other key services are set up with an extra Compose file each, as [key management](/docs/key-management) describes.
+
+## Security
+
+| Setting | Default | What it does |
+|---|---|---|
+| `HEALTH_CHECK_TOKEN` | `health-check-token-change-me` | The token needed to call `/health`, sent in the `x-api-key` header. Used by both programs. |
+| `METRICS_TOKEN` | `metrics-token-change-me` | The token needed to read `/metrics`, sent in the `x-api-key` header. Used by both programs. |
+| `HSTS_ENABLED` | `false` | Tells browsers to only ever use HTTPS for Ostiary. Turn it on only once Ostiary is reached over HTTPS. Used by both programs. |
+| `ENV` | `development` | Any value other than `development` makes the admin sign-in cookie HTTPS only. Set it to `production` when the admin API is reached over HTTPS. |
+
+The sign-in cookie is also HTTPS only whenever `COOKIE_SAMESITE` is `none`, whatever `ENV` says, because browsers require it.
+
+## Logging
+
+Both programs always write their logs to the console, which Docker shows with `docker compose logs`. They can also send them to [Seq](https://datalust.co/seq), a server for searching logs.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `SEQ_URL` | None | The full address Seq receives logs at, ending in `/ingest/clef`, such as `https://seq.example.com/ingest/clef`. Leave it empty to not use Seq. |
+| `SEQ_API_KEY` | None | The API key for Seq, if your Seq server needs one. |
+
+[Monitoring](/docs/monitoring) covers logs, metrics and health checks.

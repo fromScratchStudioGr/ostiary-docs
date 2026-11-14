@@ -1,0 +1,45 @@
+---
+title: Ostiary keys
+description: The keys your applications use to call Ostiary.
+---
+
+An Ostiary key is what a consumer sends to Ostiary instead of a provider key. Every Ostiary key belongs to one consumer, and Ostiary uses it to tell who sent a request.
+
+Ostiary keys start with `ost_`, followed by a long random string. For example:
+
+```
+ost_Xk3pQ9vR2mT7wL5nB8cF1hJ4dG6sA0eY9uI2oP7qZ3w
+```
+
+## Creating a key
+
+You create an Ostiary key for a consumer in the admin panel. Each key has:
+
+- **A name**, so you can tell keys apart, for example `production` or `dev`.
+- **An expiry date**, between 1 and 365 days from when you create it. After that date the key stops working.
+
+The full key is shown only once, when you create it. Copy it straight away and keep it somewhere safe. Ostiary only stores a fingerprint of the key, not the key itself, so it cannot show it to you again. If you lose a key, create a new one.
+
+After that, the panel shows only the key's last four characters, its expiry date and when it was last used.
+
+A consumer can have several keys. This lets you give each environment its own key, or replace a key without any downtime: create the new key, move your application over to it, then switch the old one off.
+
+## Using a key
+
+Send the key with each request, in any of these headers:
+
+- `Authorization: Bearer ost_your_key`, which the OpenAI library uses
+- `x-api-key: ost_your_key`, which the Anthropic library uses
+- `x-goog-api-key: ost_your_key`, which the Google Gen AI library uses
+
+The official libraries already send the key in the right header. You only give them your Ostiary key, as [official libraries](/docs/getting-started/official-libraries) shows.
+
+## Switching a key off and on
+
+You can switch an Ostiary key off at any time, for example if it has leaked. While it is off, every request that uses it is refused. You can switch it back on later.
+
+Keys are deleted when their consumer is deleted. To stop using a single key for good, switch it off.
+
+## Last used
+
+The panel shows when each key was last used. To save work on busy keys, this is updated at most every 30 seconds, so it can be slightly behind.

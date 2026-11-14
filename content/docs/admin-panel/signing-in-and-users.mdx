@@ -1,0 +1,32 @@
+---
+title: Signing in and admins
+description: The first sign-in, and managing the admins who can use the panel.
+---
+
+Only admins can sign in to the panel. Admins are people, separate from [consumers](/docs/concepts/consumers), which never sign in.
+
+## The first sign-in
+
+The first time the admin API starts with an empty database, it creates one admin, `admin`, with the password `admin`.
+
+Sign in with it, then change the password straight away: on the **Admins** page, click **Reset password** next to `admin`.
+
+<Callout type="warn">
+Until you change it, anyone who can open the panel can sign in with `admin` and `admin`. Never make the panel reachable by others before changing it.
+</Callout>
+
+## Staying signed in
+
+You stay signed in for 48 hours, unless you sign out. After that, the panel asks you to sign in again. You can change this time with `JWT_EXPIRATION_HOURS`, described in [configuration](/docs/configuration#admin-api).
+
+## Managing admins
+
+The **Admins** page lists everyone who can sign in to the panel. Every admin can do everything, including managing other admins.
+
+- **Add admin:** choose a username and a password.
+- **Reset password:** set a new password for any admin, including yourself.
+- **Delete:** remove an admin for good. You can't delete your own account.
+
+The panel asks for passwords of at least 8 characters, with an uppercase letter, a lowercase letter, a number and a symbol.
+
+Give each person their own admin account rather than sharing one, so you can remove someone's access without affecting anyone else.

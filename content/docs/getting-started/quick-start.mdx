@@ -1,0 +1,139 @@
+---
+title: Quick start
+description: Run Ostiary on your own machine and send your first request.
+---
+
+This page gets Ostiary running on your own machine with one command, then walks you through sending your first request. It takes about ten minutes.
+
+## What you need
+
+- [Docker](https://docs.docker.com/get-started/get-docker/), with Docker Compose. Docker Desktop on Windows and macOS includes both.
+- [Git](https://git-scm.com/downloads), to get the code.
+- A key from at least one provider: OpenAI, Anthropic, Google Gemini or DeepSeek.
+
+## 1. Get the code
+
+{/* TODO: once the panel image is published, docker-compose.yml pulls it instead of building the panel from a local copy of the panel repository. Until then, this step also needs the panel cloned next to Ostiary. */}
+
+```bash
+git clone https://github.com/fromScratchStudioGr/ostiary.git
+cd ostiary
+```
+
+## 2. Create a master key
+
+Ostiary stores your provider keys encrypted. To try it out, it can use a built in local key service, which needs a master key: a random secret that the provider keys are encrypted with.
+
+Create a file called `.env` in the `ostiary` folder with a new master key in it:
+
+```bash tab="bash"
+echo "LOCAL_KMS_MASTER_KEY=$(openssl rand -base64 32)" > .env
+```
+
+```bat tab="cmd"
+powershell -NoProfile -Command "$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); 'LOCAL_KMS_MASTER_KEY=' + [Convert]::ToBase64String($b) | Out-File -Encoding ascii .env"
+```
+
+```powershell tab="PowerShell"
+$b = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+'LOCAL_KMS_MASTER_KEY=' + [Convert]::ToBase64String($b) | Out-File -Encoding ascii .env
+```
+
+<Callout type="warn">
+Keep this key. If you lose it or change it, Ostiary can no longer read the provider keys it has stored, and you have to add them again.
+</Callout>
+
+The local key service is meant for trying Ostiary out. For real use, set up OpenBao or Google Cloud KMS as [key management](/docs/key-management) describes.
+
+## 3. Start Ostiary
+
+```bash
+docker compose up -d
+```
+
+The first time, Docker builds the images, which takes a few minutes. After that, Ostiary starts in seconds.
+
+This starts five services:
+
+| Service | What it is | Address |
+|---|---|---|
+| `gateway` | The gateway your applications send requests to | http://localhost:8080 |
+| `admin` | The admin API, which the panel uses to manage keys, consumers and usage | http://localhost:8081 |
+| `panel` | The admin panel, a web app | http://localhost:3001 |
+| `postgres` | The database | Not published |
+| `redis` | The cache and the queue for recording usage | Not published |
+
+Check that everything is up:
+
+```bash
+docker compose ps
+```
+
+Each service shows `healthy` once it is ready.
+
+<Callout>
+Docker Compose fills in default passwords and secrets for the database, the cache and the admin API. They are fine for trying Ostiary out on your own machine. Change every one of them before you use Ostiary for real, as [deployment](/docs/deployment) describes.
+</Callout>
+
+## 4. Sign in to the panel
+
+Open http://localhost:3001 and sign in as `admin` with the password `admin`.
+
+Change the password straight away on the **Admins** page.
+
+## 5. Create an Ostiary key
+
+In the panel:
+
+1. Add a provider key: the real key you got from OpenAI, Anthropic, Google Gemini or DeepSeek.
+2. Create a consumer for your application. A consumer is whoever uses Ostiary: an application, a team or a person.
+3. Give the consumer access to the provider key. You can set a spending limit if you like.
+4. Create an Ostiary key for the consumer and copy it. Ostiary keys start with `ost_`. The full key is shown only once.
+
+[Concepts](/docs/concepts) explains each of these in more detail.
+
+## 6. Send your first request
+
+Replace `ost_your_key` with your Ostiary key. The example uses an OpenAI model, so the consumer needs access to an OpenAI provider key. To try another provider, see [official libraries](/docs/getting-started/official-libraries).
+
+```bash tab="bash"
+curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer ost_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-5.4-mini", "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+```bat tab="cmd"
+curl http://localhost:8080/v1/chat/completions ^
+  -H "Authorization: Bearer ost_your_key" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"model\": \"gpt-5.4-mini\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}]}"
+```
+
+```powershell tab="PowerShell"
+Invoke-RestMethod -Uri http://localhost:8080/v1/chat/completions -Method Post `
+  -Headers @{ Authorization = "Bearer ost_your_key" } `
+  -ContentType "application/json" `
+  -Body '{"model": "gpt-5.4-mini", "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+You get the model's answer back, exactly as the provider sent it. A moment later, the request and its cost show up on the **Usage** page of the panel.
+
+## Stopping Ostiary
+
+```bash
+docker compose down
+```
+
+Your data is kept for next time: admin users, provider keys, consumers, Ostiary keys and usage. To delete all of it and start from scratch, add `-v`:
+
+```bash
+docker compose down -v
+```
+
+## Next steps
+
+- [Official libraries](/docs/getting-started/official-libraries): use Ostiary from your code.
+- [Concepts](/docs/concepts): how provider keys, consumers, access and Ostiary keys fit together.
+- [Deployment](/docs/deployment): what to change before you use Ostiary for real.

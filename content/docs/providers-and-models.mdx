@@ -1,0 +1,97 @@
+---
+title: Providers and models
+description: The providers and models this version of Ostiary supports, and how it works out what each request costs.
+---
+
+Ostiary supports four providers: OpenAI, Anthropic, Google Gemini and DeepSeek. This page lists the models this version supports, and explains how Ostiary turns a request's tokens into a cost.
+
+## Formats
+
+Each provider has its own format for requests and answers. Ostiary does not translate between them. Your application sends a request in the model's own format, and Ostiary passes it on unchanged.
+
+| Provider | Format | Send requests to |
+|---|---|---|
+| OpenAI | Chat completions | `POST /v1/chat/completions` |
+| DeepSeek | Chat completions, the same as OpenAI | `POST /v1/chat/completions` |
+| Anthropic | Messages | `POST /v1/messages` |
+| Google Gemini | Interactions | `POST /v1/interactions` or `POST /v1beta/interactions` |
+
+Google's own library sends requests to `/v1beta/interactions`, so Ostiary accepts that address too.
+
+The `model` in the request decides which provider it goes to. If Ostiary does not know the model, it refuses the request with `Unsupported model`.
+
+**Batch calls.** Version 1 of Ostiary does not support the providers' batch calls, where you send many requests at once and collect the answers later. Ostiary answers them with `404 Not Found`. Send batch calls to the provider directly.
+
+## How the cost is worked out
+
+Ostiary knows the price of every model it supports, in US dollars per million tokens. For each request, it multiplies every kind of token (input, cached input, cache writes and output) by that model's price for it, and adds them up. [Usage and billing](/docs/concepts/usage-and-billing) explains what each kind of token is.
+
+Some models have extra rules, described with their provider below:
+
+- **Long requests.** Some models cost more when a request is very long. Once the input of a request goes over the model's limit, the whole request is priced at the higher rates. The input here counts every kind of input token: normal, cached and cache writes.
+- **Where the request runs.** Anthropic charges more for requests it runs only in the United States.
+- **Busy hours.** DeepSeek charges more at certain hours.
+
+The cost is worked out once, when the request is made, using the prices in your version of Ostiary. When a provider changes its prices, Ostiary is updated in a new version. The prices are in each provider's `models.go` file in the [Ostiary repository](https://github.com/fromScratchStudioGr/ostiary/tree/main/internal/providers).
+
+## OpenAI
+
+- `gpt-6.1-sol`
+- `gpt-6-astra`
+- `gpt-6-sol`
+- `gpt-6-luna`
+- `gpt-5.6-sol`
+- `gpt-5.6-terra`
+- `gpt-5.6-luna`
+- `gpt-5.5`
+- `gpt-5.4`
+- `gpt-5.4-mini`
+- `gpt-5.4-nano`
+
+**Long requests.** All OpenAI models except `gpt-5.4-mini` and `gpt-5.4-nano` cost more when the input goes over 272,000 tokens.
+
+## Anthropic
+
+- `claude-fable-5-1`
+- `claude-opus-5-5`
+- `claude-sonnet-5-5`
+- `claude-fable-5`
+- `claude-opus-5`
+- `claude-sonnet-5`
+- `claude-opus-4-8`
+- `claude-opus-4-7`
+- `claude-opus-4-6`
+- `claude-sonnet-4-6`
+- `claude-opus-4-5`
+- `claude-haiku-4-5`
+
+**Cache writes.** Anthropic can keep cached input for 5 minutes or for 1 hour, and keeping it longer costs more to write. If Anthropic reports cache writes without saying how long they are kept, Ostiary prices them as 5 minute writes.
+
+**United States only.** When Anthropic reports that a request ran only in the United States, every price is 1.1 times higher.
+
+**Server tools.** Anthropic offers tools that run on its own servers, such as web search, and charges for each use. Version 1 of Ostiary does not count these charges. Requests that use server tools work as normal, but their recorded cost only includes tokens, so it is lower than what Anthropic charges.
+
+## Google Gemini
+
+- `gemini-3.8-flash`
+- `gemini-3.7-flash`
+- `gemini-3.6-flash`
+- `gemini-3.5-flash`
+- `gemini-3.5-flash-lite`
+- `gemini-3.1-flash-lite`
+- `gemini-2.5-pro`
+- `gemini-2.5-flash`
+- `gemini-2.5-flash-lite`
+
+**Long requests.** `gemini-2.5-pro` costs more when the input goes over 200,000 tokens.
+
+## DeepSeek
+
+- `deepseek-flash`
+- `deepseek-v4-pro`
+
+**Busy hours.** Every price is doubled from 01:00 to 04:00 and from 06:00 to 10:00 UTC, Monday to Friday. Chinese public holidays are not busy hours.
+
+## Models that are not listed
+
+Ostiary only accepts the models on this page. Adding a model, or changing a price, means changing Ostiary's code, so it comes with a new version. If you need a model that is missing, open an issue or a pull request in the [Ostiary repository](https://github.com/fromScratchStudioGr/ostiary).

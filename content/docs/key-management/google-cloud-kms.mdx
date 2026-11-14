@@ -1,0 +1,103 @@
+---
+title: Google Cloud KMS
+description: Keep the master key in Google Cloud's key service.
+---
+
+With Google Cloud KMS, the master key lives in Google Cloud and never leaves it. Ostiary signs in to Google Cloud with a service account, an account made for a program rather than a person, and asks Google Cloud to encrypt and unlock keys for it.
+
+## What you need
+
+- A Google Cloud project, with billing turned on.
+- The [gcloud command line tool](https://cloud.google.com/sdk/docs/install), signed in with an account that can manage the project.
+
+In the commands below, replace `PROJECT_ID` with your project's ID, and `LOCATION` with a Google Cloud region close to where Ostiary runs, such as `europe-west8`.
+
+## 1. Select the project
+
+```bash
+gcloud auth login
+gcloud config set project PROJECT_ID
+```
+
+## 2. Turn on Cloud KMS
+
+```bash
+gcloud services enable cloudkms.googleapis.com
+```
+
+## 3. Create the key
+
+Create a key ring, which is a group of keys, and a key in it:
+
+```bash
+gcloud kms keyrings create ostiary --location=LOCATION
+gcloud kms keys create dek-wrapper --keyring=ostiary --location=LOCATION --purpose=encryption
+```
+
+The key's full name is what Ostiary needs. It looks like this:
+
+```
+projects/PROJECT_ID/locations/LOCATION/keyRings/ostiary/cryptoKeys/dek-wrapper
+```
+
+## 4. Create a service account for Ostiary
+
+Create the service account, and allow it to use only this key, to encrypt and unlock:
+
+```bash
+gcloud iam service-accounts create ostiary-kms --display-name="Ostiary KMS"
+gcloud kms keys add-iam-policy-binding dek-wrapper --keyring=ostiary --location=LOCATION --member="serviceAccount:ostiary-kms@PROJECT_ID.iam.gserviceaccount.com" --role="roles/cloudkms.cryptoKeyEncrypterDecrypter"
+```
+
+## 5. Create a key file for the service account
+
+Ostiary runs in a container, so it signs in to Google Cloud with a key file for the service account. Create it in the `ostiary` folder:
+
+```bash
+gcloud iam service-accounts keys create gcp-kms-key.json --iam-account=ostiary-kms@PROJECT_ID.iam.gserviceaccount.com
+```
+
+<Callout type="warn">
+This file is a real secret: anyone who has it can use the key. Never commit it to Git or share it. If it leaks, delete the key in Google Cloud and create a new one.
+</Callout>
+
+If the command fails with `Key creation is not allowed on this service account`, your Google Cloud organisation blocks key files by default. An organisation administrator can allow them for this project by turning off the `iam.disableServiceAccountKeyCreation` policy for it. It can take a few minutes before the change applies.
+
+## 6. Fill in .env
+
+Add these lines to the `.env` file next to `docker-compose.yml`:
+
+```bash title=".env"
+GCP_KMS_KEY_NAME=projects/PROJECT_ID/locations/LOCATION/keyRings/ostiary/cryptoKeys/dek-wrapper
+GCP_KMS_CREDENTIALS_FILE=./gcp-kms-key.json
+```
+
+`LOCAL_KMS_MASTER_KEY` is not needed with Google Cloud KMS.
+
+## 7. Let the container read the key file (Linux only)
+
+Ostiary's containers run as a user with the ID `10001`. On Linux, the key file keeps its owner and permissions inside the container, so a file only you can read is unreadable to Ostiary, and Ostiary does not start.
+
+Give the group `10001` permission to read the file. Everyone else still can't read it:
+
+```bash
+sudo chown $USER:10001 gcp-kms-key.json && chmod 640 gcp-kms-key.json
+```
+
+On a server with SELinux turned on, such as Fedora or Red Hat, the file also needs the `:z` option where `docker-compose.gcp.yml` mounts it.
+
+Docker Desktop on Windows and macOS does not need this step.
+
+## 8. Start Ostiary
+
+Start Ostiary with the extra Compose file for Google Cloud KMS:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gcp.yml up -d
+```
+
+`docker-compose.gcp.yml` sets `KMS_PROVIDER` to `gcp`, passes the key name and gives both the gateway and the admin API the key file. Use both `-f` options with every `docker compose` command from now on, such as `ps` and `down`.
+
+## Rotating the key
+
+Google Cloud KMS can rotate the key for you on a schedule, or you can rotate it by hand. [Rotation](/docs/key-management/rotation) explains both.

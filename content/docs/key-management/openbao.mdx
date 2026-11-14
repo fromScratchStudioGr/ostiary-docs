@@ -1,0 +1,77 @@
+---
+title: OpenBao
+description: Keep the master key in OpenBao, an open source key service you run yourself.
+---
+
+[OpenBao](https://openbao.org) is an open source service for keeping secrets and keys, which you run on your own servers. Ostiary uses its Transit feature, which encrypts and unlocks data without the master key ever leaving OpenBao. Any server that works like OpenBao, such as HashiCorp Vault, works too.
+
+## Trying it out with Docker Compose
+
+Ostiary comes with an extra Compose file that starts an OpenBao server next to Ostiary and sets everything up:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.openbao.yml up -d
+```
+
+It starts OpenBao, turns on Transit, creates a key called `ostiary-dek-wrap`, and points the gateway and the admin API at it. Use both `-f` options with every `docker compose` command from then on, such as `ps` and `down`.
+
+<Callout type="warn">
+This OpenBao server runs in development mode, which is only for trying things out. It keeps everything in memory, so its key is lost every time it restarts, and provider keys added before the restart can no longer be read. It also uses a fixed sign-in token. Never use it for real.
+</Callout>
+
+## Using your own OpenBao server
+
+For real use, run OpenBao properly, with storage that survives restarts, and with backups. The [OpenBao documentation](https://openbao.org/docs/) explains how. Then:
+
+### 1. Create the key
+
+Turn on Transit, if it isn't already, and create a key for Ostiary:
+
+```bash
+bao secrets enable transit
+bao write -f transit/keys/ostiary-dek-wrap
+```
+
+### 2. Create a token for Ostiary
+
+Ostiary only needs to encrypt, unlock and rewrap with this one key. Create a policy that allows only that:
+
+```hcl title="ostiary.hcl"
+path "transit/encrypt/ostiary-dek-wrap" {
+  capabilities = ["update"]
+}
+
+path "transit/decrypt/ostiary-dek-wrap" {
+  capabilities = ["update"]
+}
+
+path "transit/rewrap/ostiary-dek-wrap" {
+  capabilities = ["update"]
+}
+```
+
+Then load the policy and create a token with it:
+
+```bash
+bao policy write ostiary ostiary.hcl
+bao token create -policy=ostiary
+```
+
+### 3. Point Ostiary at it
+
+Ostiary needs these settings, on both the gateway and the admin API:
+
+| Setting | Value |
+|---|---|
+| `KMS_PROVIDER` | `openbao` |
+| `OPENBAO_VAULT_ADDR` | The address of your OpenBao server, such as `https://bao.example.com:8200` |
+| `OPENBAO_VAULT_TOKEN` | The token you created |
+| `OPENBAO_VAULT_KEYNAME` | `ostiary-dek-wrap` |
+
+All four are required. If one is missing, the gateway and the admin API do not start, and say which one. How you pass them is up to you, for example with a Compose file of your own.
+
+`LOCAL_KMS_MASTER_KEY` is not needed with OpenBao.
+
+## Rotating the key
+
+OpenBao can rotate the key, and Ostiary can move your provider keys onto the new version without the keys ever leaving OpenBao. [Rotation](/docs/key-management/rotation) explains how.

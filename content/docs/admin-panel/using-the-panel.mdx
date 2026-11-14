@@ -1,0 +1,77 @@
+---
+title: Using the panel
+description: A tour of the panel, page by page.
+---
+
+This page walks through each page of the admin panel. [Concepts](/docs/concepts) explains the ideas behind them: provider keys, consumers, access, Ostiary keys and usage.
+
+In the panel, switching something off is called **revoking** it, and switching it back on is **reactivating** it.
+
+## Dashboard
+
+The first page after signing in. It shows how many consumers you have and how many are active, how many provider keys you have added, how many access grants there are, and how many keys you have for each provider.
+
+## Provider Keys
+
+This is where you add and manage your [provider keys](/docs/concepts/provider-keys).
+
+**Adding a key.** Click **Register key**, choose the provider and paste the key. Once added, the key is never shown again. The list shows only its last four characters.
+
+For each key, the list shows its status, how many consumers have access to it, and when it was last used. Click the provider cards at the top to show only one provider's keys.
+
+For each key you can:
+
+- **Manage access:** see which consumers can use the key, and give access to more. See [access](#giving-access) below.
+- **Revoke or reactivate it:** switch the key off or back on. While it is revoked, every request that would use it is refused.
+- **Delete it:** remove the key for good, along with every consumer's access to it.
+
+**Rewrap keys** is for after you rotate the master key in Google Cloud KMS or OpenBao. [Rotation](/docs/key-management/rotation) explains when and how to use it.
+
+## Consumers
+
+This is where you manage [consumers](/docs/concepts/consumers): the applications, teams or people that use Ostiary.
+
+Click **Add consumer** and give it a name. Then click **Manage access** next to it to set it up. This opens a window with three parts:
+
+- **Consumer status:** revoke or reactivate the whole consumer.
+- **API keys:** the consumer's Ostiary keys.
+- **Access:** the provider keys the consumer can use.
+
+Next to each consumer, you can also revoke or reactivate it, or delete it. Deleting a consumer also deletes its Ostiary keys.
+
+### Creating an Ostiary key
+
+Under **API keys**, click **New key**. Give the key a name, such as `production`, and the number of days until it expires, between 1 and 365. It is 90 days unless you change it.
+
+The full key is shown once. Copy it straight away, then click **Done**. It can't be shown again.
+
+Each key in the list shows its last four characters, its status, its expiry date and when it was last used. You can revoke a key, and reactivate it later.
+
+### Giving access
+
+Under the access list, click **Grant access**. Choose a provider key, and set a **Usage limit** in US dollars. Enter `0` for no limit.
+
+Only active provider keys that the consumer doesn't already have access to are offered. Give each consumer one key per provider, as [access and spending limits](/docs/concepts/access-and-limits) explains.
+
+Each access in the list shows its limit and how much the consumer has spent with that key. You can:
+
+- **Edit the limit:** click the pencil next to it. The new limit applies to the next request.
+- **Suspend or reactivate access:** switch this one access off or back on, keeping its limit and what was spent.
+- **Remove access:** take it away. The usage already recorded stays, but the spent total used for the limit starts again from zero if you give access again.
+
+You can also manage access from the other side: **Manage access** on the **Provider Keys** page shows every consumer with access to that key, and lets you grant it to more.
+
+## Usage
+
+The **Usage** page shows what requests have cost. It has two views:
+
+- **General:** total cost and tokens for everyone, how many consumers and provider keys were used, and the cost over time.
+- **Consumer:** choose a consumer to see its cost and tokens, its tokens per day, and its cost for each provider key.
+
+In both views, choose the last 7, 14 or 21 days or all time, and show all providers or just one.
+
+Usage shows up a moment after a request finishes, as [usage and billing](/docs/concepts/usage-and-billing) explains.
+
+## Admins
+
+The **Admins** page manages who can sign in to the panel. [Signing in and admins](/docs/admin-panel/signing-in-and-users) covers it.

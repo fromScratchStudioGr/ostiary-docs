@@ -1,0 +1,34 @@
+---
+title: Overview
+description: How Ostiary keeps provider keys encrypted, and how to choose a key service.
+---
+
+Ostiary never stores a provider key as plain text. It encrypts every provider key with the help of a **key service**: a separate system that holds a master key and does the encrypting and unlocking for Ostiary. This is often called a KMS, short for key management service.
+
+## How it works
+
+Each provider key is encrypted with a key of its own, made just for it. That key is then encrypted by the key service, using the master key. Ostiary stores both, encrypted, in its database.
+
+To use a provider key, Ostiary asks the key service to unlock the provider key's own key, then uses that to unlock the provider key. It keeps the provider key unlocked only for as long as the request needs it.
+
+So someone who gets a copy of Ostiary's database still cannot read your provider keys. They would also need the key service.
+
+## Choosing a key service
+
+| Key service | What it is | Use it for |
+|---|---|---|
+| [Local](/docs/key-management/local) | Built into Ostiary. The master key is a setting you give Ostiary. | Trying Ostiary out only. |
+| [Google Cloud KMS](/docs/key-management/google-cloud-kms) | Google Cloud's key service. The master key never leaves Google Cloud. | Real use, if you already use Google Cloud. |
+| [OpenBao](/docs/key-management/openbao) | An open source key service you run yourself. The master key never leaves OpenBao. | Real use, if you want to keep everything on your own servers. |
+
+You choose the key service with `KMS_PROVIDER`: `local`, `gcp` or `openbao`. The gateway and the admin API must use the same key service with the same settings, because the admin API encrypts provider keys when you add them, and the gateway unlocks them.
+
+## Choose before you add provider keys
+
+Provider keys can only be unlocked by the key service that encrypted them. If you switch to another key service later, Ostiary can no longer read the provider keys you already added. You then have to delete them, add them again and give consumers access to them again.
+
+So pick the key service you will use for real before you add your provider keys.
+
+## Rotating the master key
+
+Google Cloud KMS and OpenBao can replace the master key with a new version, which is called rotating it. [Rotation](/docs/key-management/rotation) explains how to do that and move your provider keys onto the new version.

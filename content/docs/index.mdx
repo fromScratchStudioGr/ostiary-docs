@@ -1,0 +1,51 @@
+---
+title: Introduction
+description: What Ostiary is, why it exists and where its name comes from.
+---
+
+Ostiary is a fast, simple and secure gateway between your applications and AI model providers such as OpenAI, Anthropic, Google Gemini and DeepSeek.
+
+A gateway is a service that sits in the middle. Instead of calling a provider directly, your applications send their requests to Ostiary. Each application uses a key of its own, an **Ostiary key**. Ostiary checks that key, adds the real provider key, sends the request on to the provider and passes the answer back. Along the way it records how many tokens the request used and what it cost.
+
+Your applications never see the real provider keys. Those stay with Ostiary, stored encrypted.
+
+Ostiary is an LLM gateway and only that. You run it, you control it, you own it.
+
+## Why we built it
+
+We wanted an LLM gateway we could use ourselves: really fast, easy to scale and secure. It had to be simple to set up and simple to use, without all the extras that usually come with it. No upselling, no paid tier, no strings attached.
+
+We also wanted it to be as open as possible. Ostiary works with open source tools for keeping keys safe, and with open models. When you need them, it works just as well with proprietary key services and closed models.
+
+Four goals guided every decision.
+
+**Fast.** Ostiary adds well under a millisecond of its own time to a typical request before it reaches the provider. Answers stream back to your applications as they arrive.
+
+**Scalable.** A basic machine handles well over a thousand requests per second. Every copy of Ostiary shares the same database and cache, so you can run more copies side by side when you need more.
+
+**Easy to use.** It starts with one command. Your applications keep using the official libraries. You only change the address and the key.
+
+**Secure.** Provider keys are stored encrypted and are only unlocked for the moment a request needs them. Your applications never see them. Each application gets its own key, which you can limit or switch off at any time.
+
+The [performance](/docs/performance) page shows the figures behind these goals and how they were measured.
+
+## What it does
+
+- Gives each application, team or person its own Ostiary key, so the real provider keys stay in one place.
+- Keeps provider keys encrypted with a key service of your choice: OpenBao, Google Cloud KMS, or a built in local option for trying it out.
+- Records the tokens and the cost of every request, using each model's own prices, cached input included.
+- Lets you set a spending limit for each application on each provider key.
+- Speaks the providers' own formats: OpenAI chat completions, Anthropic messages and Gemini interactions. Your applications keep using the official libraries and only change the address and the key.
+- Comes with an [admin panel](https://github.com/fromScratchStudioGr/ostiary-panel), a web app for managing keys, applications and usage.
+- Publishes metrics for Prometheus, so you can monitor it around the clock.
+
+## The name
+
+The word ostiary comes from the Latin ostiarius, the doorkeeper who decided who could pass through a door. Ostiary does the same for your AI providers: it checks every key at the door and keeps the real keys safely inside.
+
+## Open source
+
+Ostiary is released under the MIT License by fromScratch Studio. It is at version 1 and stable. There are two repositories:
+
+- [Ostiary](https://github.com/fromScratchStudioGr/ostiary), the gateway itself, written in Go.
+- [Ostiary panel](https://github.com/fromScratchStudioGr/ostiary-panel), the admin panel.

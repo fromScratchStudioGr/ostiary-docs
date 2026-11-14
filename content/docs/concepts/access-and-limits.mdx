@@ -1,0 +1,34 @@
+---
+title: Access and spending limits
+description: Which provider keys a consumer may use, and how much it may spend.
+---
+
+Access is what connects a consumer to a provider key. A consumer can only use a provider key it has been given access to. A provider key can be shared by as many consumers as you like.
+
+## Giving access
+
+You give a consumer access to a provider key in the admin panel. From then on, when the consumer asks for a model from that provider, Ostiary uses that provider key.
+
+Ostiary picks the provider key by the provider of the model a request asks for. In version 1, if a consumer has access to more than one key from the same provider, Ostiary always uses the one it was given access to first. The others are not used, even if that first key is switched off or over its limit. So give each consumer access to one provider key per provider, for example one OpenAI key and one Anthropic key.
+
+## Spending limits
+
+When you give access, you can set a spending limit in US dollars. The limit applies to that consumer on that provider key. If you leave it empty or set it to zero, there is no limit.
+
+Ostiary adds up the cost of every request the consumer makes with that provider key. Once the total goes over the limit, Ostiary refuses the consumer's requests to that provider with the error `Usage limit exceeded`. Other consumers sharing the same provider key are not affected.
+
+Some things to know:
+
+- **The total does not reset on its own.** It counts everything since the access was given. To allow more spending, raise the limit. To start counting from zero, remove the access and give it again.
+- **The limit is not exact, and spending can go over it.** Ostiary checks the limit before a request goes out, but only knows the cost once the answer is complete. Every request that starts under the limit is allowed to finish, even if it takes the total over, and so is every request already in progress at that moment. A busy consumer can therefore spend noticeably more than its limit before it is stopped. Treat the limit as a safety net, and set it with some room to spare.
+- **The cost is Ostiary's own count,** based on each model's prices. It can differ from your provider's invoice. [Usage and billing](/docs/concepts/usage-and-billing) explains why.
+
+You can change a limit at any time. The new limit applies to the next request.
+
+## Switching access off and on
+
+You can switch a consumer's access to a provider key off without removing it. While it is off, the consumer's requests to that provider are refused. The limit and the total spent so far are kept.
+
+## Removing access
+
+Removing access stops the consumer from using that provider key. The usage already recorded is kept, but the running total used for the spending limit is not. If you give the access again, the total starts from zero.

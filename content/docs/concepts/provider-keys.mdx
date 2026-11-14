@@ -1,0 +1,38 @@
+---
+title: Provider keys
+description: The real keys from your AI providers, and how Ostiary keeps them safe.
+---
+
+A provider key is a real key you get from an AI provider: OpenAI, Anthropic, Google Gemini or DeepSeek. It is what the provider charges your account for. Ostiary keeps your provider keys in one place, so your applications never need to see them.
+
+## Adding a provider key
+
+You add a provider key in the admin panel by choosing the provider and pasting the key. From then on, Ostiary uses it for any consumer you give [access](/docs/concepts/access-and-limits) to it.
+
+You can add several keys for the same provider, for example one per team or one per budget.
+
+After you add a key, Ostiary never shows it again. The panel only shows its last four characters, so you can tell your keys apart.
+
+## How the key is kept safe
+
+Ostiary stores every provider key encrypted, never as plain text.
+
+Each key is encrypted with a key of its own, made just for it. That key is then itself encrypted by a key service, which holds the master key. Ostiary never stores the master key next to the data. To use a provider key, Ostiary asks the key service to unlock it, uses it for the request, and keeps it unlocked only for as long as the request needs it.
+
+You choose the key service: OpenBao, Google Cloud KMS, or a built in local one for trying Ostiary out. [Key management](/docs/key-management) explains each of them.
+
+## Switching a key off and on
+
+You can switch a provider key off at any time. While it is off, every request that would use it is refused. Consumers keep their access, so switching it back on restores everything as it was.
+
+This is useful if you suspect a key has leaked, or want to pause spending on it without changing anything else.
+
+## Deleting a key
+
+Deleting a provider key also removes every consumer's access to it. The usage already recorded for it is kept.
+
+If you only want to stop using a key for a while, switch it off instead.
+
+## Last used
+
+The panel shows when each provider key was last used. To save work on busy keys, this is updated at most every 30 seconds, so it can be slightly behind.

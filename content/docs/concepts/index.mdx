@@ -1,0 +1,58 @@
+---
+title: Overview
+description: How provider keys, consumers, access, Ostiary keys and usage fit together.
+---
+
+Ostiary is built on five ideas. Once you know them, the admin panel and the rest of these docs follow naturally.
+
+| Idea | What it is |
+|---|---|
+| [Provider key](/docs/concepts/provider-keys) | A real key from OpenAI, Anthropic, Google Gemini or DeepSeek, stored encrypted in Ostiary. |
+| [Consumer](/docs/concepts/consumers) | Whoever uses Ostiary: an application, a team or a person. |
+| [Access](/docs/concepts/access-and-limits) | Permission for a consumer to use a provider key, with an optional spending limit. |
+| [Ostiary key](/docs/concepts/ostiary-keys) | The key a consumer sends to Ostiary. |
+| [Usage](/docs/concepts/usage-and-billing) | The tokens and cost of every request, recorded per consumer and provider key. |
+
+## How they fit together
+
+You add your provider keys once. You create a consumer for each application, team or person, and give it access to the provider keys it needs. The consumer gets one or more Ostiary keys, which it uses to call Ostiary.
+
+<ConceptFlow
+  steps={[
+    { title: 'Ostiary key', description: 'Sent with every request' },
+    { title: 'Consumer', description: 'An application, team or person' },
+    { title: 'Provider key', description: 'The real key, stored encrypted' },
+  ]}
+  links={[
+    { label: 'belongs to' },
+    { label: 'has access to', note: 'with a spending limit' },
+  ]}
+/>
+
+When a request comes in, Ostiary:
+
+1. Finds the consumer the Ostiary key belongs to.
+2. Looks at the model the request asks for, and so which provider it belongs to.
+3. Finds the provider key of that provider the consumer has access to.
+4. Unlocks that provider key, sends the request to the provider and passes the answer back.
+5. Records the tokens and the cost against the consumer and the provider key.
+
+## What Ostiary checks on every request
+
+A request only reaches the provider if all of these are true:
+
+- The Ostiary key exists, is switched on and has not expired.
+- The model is one Ostiary supports.
+- The consumer has access to a provider key of that model's provider.
+- The consumer is switched on.
+- The consumer has not gone over its spending limit on that provider key.
+- The provider key is switched on.
+- The access itself is switched on.
+
+If any check fails, Ostiary answers with an error and nothing is sent to the provider.
+
+## How quickly changes take effect
+
+To stay fast, Ostiary remembers the result of these checks for a while instead of asking the database on every request.
+
+When you change something in the admin panel, such as switching off a key or a consumer, Ostiary clears what it remembered straight away. Each running copy of the gateway also keeps its own short-lived copy in memory, for up to five minutes by default. So a change can take up to five minutes to reach every copy of the gateway. You can shorten this with `LOCAL_CACHE_TTL`, described in [configuration](/docs/configuration).
